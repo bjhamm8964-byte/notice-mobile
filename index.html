@@ -29,7 +29,7 @@ canvas{min-width:0;min-height:0;flex-shrink:1}
 .scaleEnds{display:flex;justify-content:space-between;margin:0 54px 8px;color:#7c8d7f;font-size:11px}
 #imageNote p{margin:6px 0 0}
 .imageSelected #size,.imageSelected #color,.imageSelected #bold{display:none}
-</style><body><div id="app" class="app" data-version="20261102-inline-v4-imageslider">
+</style><body><div id="app" class="app" data-version="20261109-history-v1">
 <header class="topbar"><div class="brand"><small>编辑就在画面下方</small><h1>公告板</h1></div><button id="dateMenu" class="dateButton" aria-label="选择公告日期">今天</button><button id="menu" class="menuButton" aria-label="菜单">☰</button></header>
 <section class="boardArea" aria-label="实时公告"><div class="boardMeta"><span id="boardHint">点画面里的内容，直接修改</span><b>实时画面</b></div><div class="stage"><canvas id="canvas" width="1920" height="1080" aria-label="公告画面，可点选内容编辑"></canvas><img id="screen" alt="已发布公告"></div></section>
 <div class="statusbar"><span id="status" role="status">正在恢复草稿…</span><span id="saved" hidden></span></div>
@@ -56,7 +56,7 @@ function draw(selection=true){ctx.fillStyle=draft.bg;ctx.fillRect(0,0,W,H);ctx.t
 async function loadImages(){await Promise.all(draft.items.filter(i=>i.type==='image'&&!images.has(i.src)).map(i=>new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{images.set(i.src,im);resolve()};im.onerror=()=>reject(Error('图片无法读取'));im.src=i.src})));draw()}
 function controls(){renderLayers();syncEditor();const i=current();for(const id of ['text','size','color','bold','x','y','width'])$(id).disabled=!i||(['text','size','color','bold'].includes(id)&&i.type!=='text');if(i){$('text').value=i.text||'';$('size').value=i.size||56;$('color').value=i.color||'#173d30';$('x').value=Math.round(i.x);$('y').value=Math.round(i.y);$('width').value=Math.round(i.w);$('bold').style.fontWeight=i.bold?'700':'400'}else $('text').value='';$('bg').value=draft.bg;syncImageScale();draw()}
 function addText(text=''){if(pending||loadingDay)return;if(draft.items.length>=100)return say('公告最多容纳100项，请先删除不需要的内容');finishEditor();const y=Math.max(200,...draft.items.map(i=>i.y+height(i)+28));if(y>H-85)return say('画面已满，请先删除内容或在排版中缩小字号');checkpoint();const i={id:crypto.randomUUID(),type:'text',text,x:100,y,w:1720,size:56,color:'#173d30',bold:false};draft.items.push(i);selected=i.id;fitText(i);controls();save();openEditor(true);say('边输入边看上方画面，完成后再发布')}
-async function addImages(files){if(pending||loadingDay)return;finishEditor();checkpoint();pending=true;syncBusy();try{for(const f of files){if(draft.items.length>=100)throw Error('公告最多容纳100项');if(!f.type.startsWith('image/'))continue;const url=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});const im=await new Promise((r,j)=>{const a=new Image();a.onload=()=>r(a);a.onerror=j;a.src=url});const temp=document.createElement('canvas'),ratio=Math.min(1,1920/im.width,1080/im.height);temp.width=Math.round(im.width*ratio);temp.height=Math.round(im.height*ratio);temp.getContext('2d').drawImage(im,0,0,temp.width,temp.height);const src=temp.toDataURL('image/png'),y=Math.max(200,...draft.items.map(i=>i.y+height(i)+28));if(y>H-80)throw Error('画面已满，请先调整现有内容');const w=Math.min(1720,temp.width,(H-y-30)*temp.width/temp.height),h=w*temp.height/temp.width;const i={id:crypto.randomUUID(),type:'image',src,x:100,y,w,h};draft.items.push(i);selected=i.id}await loadImages();controls();save();openEditor(false)}finally{pending=false;syncBusy()}}
+async function addImages(files){if(pending||loadingDay)return;finishEditor();checkpoint();pending=true;syncBusy();try{for(const f of files){if(draft.items.length>=100)throw Error('公告最多容纳100项');if(!f.type.startsWith('image/'))continue;const url=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});const im=await new Promise((r,j)=>{const a=new Image();a.onload=()=>r(a);a.onerror=j;a.src=url});const temp=document.createElement('canvas'),ratio=Math.min(1,1920/im.width,1080/im.height);temp.width=Math.round(im.width*ratio);temp.height=Math.round(im.height*ratio);temp.getContext('2d').drawImage(im,0,0,temp.width,temp.height);const src=noticeEncode(temp,f.type==='image/jpeg'),y=Math.max(200,...draft.items.map(i=>i.y+height(i)+28));if(y>H-80)throw Error('画面已满，请先调整现有内容');const w=Math.min(1720,temp.width,(H-y-30)*temp.width/temp.height),h=w*temp.height/temp.width;const i={id:crypto.randomUUID(),type:'image',src,x:100,y,w,h};draft.items.push(i);selected=i.id}await loadImages();controls();save();openEditor(false)}finally{pending=false;syncBusy()}}
 $('addText').onclick=()=>addText();$('addImage').onclick=()=>$('file').click();$('file').onchange=async e=>{try{await addImages([...e.target.files])}catch{say('图片读取失败')}e.target.value=''};
 let textUndo=false;$('text').onfocus=()=>{textUndo=false};$('text').oninput=()=>{const i=current();if(!i||i.type!=='text')return;if(!textUndo){checkpoint();textUndo=true}i.text=$('text').value;fitText(i);$('size').value=i.size;save()};
 for(const id of ['size','color','x','y','width'])$(id).onchange=()=>{const i=current();if(!i)return;checkpoint();if(id==='color')i.color=$(id).value;else{let v=Number($(id).value);if(!Number.isFinite(v))return;if(id==='size')i.size=Math.max(12,Math.min(240,v));if(id==='x'||id==='y')i[id]=Math.max(0,Math.min(id==='x'?W-30:H-30,v));if(id==='width'){const old=i.w;i.w=Math.max(30,Math.min(W-i.x,v));if(i.type==='image')i.h*=i.w/old}}controls();save()};
@@ -70,7 +70,7 @@ canvas.onpointercancel=()=>{if(drag?.changed)save();drag=null;controls()};
 document.addEventListener('paste',async e=>{if(viewer||pending||loadingDay)return;const fs=[...e.clipboardData.items].filter(i=>i.type.startsWith('image/')).map(i=>i.getAsFile());if(fs.length){e.preventDefault();try{await addImages(fs)}catch{say('粘贴图片失败')}}else{if(/INPUT|TEXTAREA/.test(e.target.tagName))return;const t=e.clipboardData.getData('text/plain');if(t){e.preventDefault();addText(t)}}});document.addEventListener('keydown',e=>{if(viewer||/INPUT|TEXTAREA/.test(e.target.tagName))return;if(e.key==='Delete'||e.key==='Backspace'){$('remove').click();e.preventDefault()}if((e.metaKey||e.ctrlKey)&&e.key==='z'){$('undo').click();e.preventDefault()}});
 function download(name,data,type){const u=URL.createObjectURL(new Blob([data],{type}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}$('export').onclick=()=>download('公告板草稿_'+activeDate+'.json',JSON.stringify({schema:'notice-draft-v1',date:activeDate,draft}),'application/json');$('import').onclick=()=>$('draftFile').click();
 function validDraft(d){return d&&/^#[0-9a-f]{6}$/i.test(d.bg)&&Array.isArray(d.items)&&d.items.length<=100&&d.items.every(i=>['text','image'].includes(i.type)&&['x','y','w'].every(k=>Number.isFinite(i[k]))&&i.w>0&&(i.type==='text'?typeof i.text==='string'&&Number.isFinite(i.size)&&i.size>=12&&i.size<=240&&/^#[0-9a-f]{6}$/i.test(i.color):/^data:image\/(png|jpeg|webp);base64,/.test(i.src)&&Number.isFinite(i.h)&&i.h>0))}
-$('draftFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>12000000)throw Error('草稿文件过大');const d=JSON.parse(await f.text());if(!['notice-draft-v1','homework-draft-v1'].includes(d.schema)||!validDraft(d.draft))throw Error('草稿格式不正确');checkpoint();draft=d.draft;selected=null;await loadImages();controls();save()}catch(e){say(e.message)}e.target.value=''};
+$('draftFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>40000000)throw Error('草稿文件过大');const d=JSON.parse(await f.text());if(!['notice-draft-v1','homework-draft-v1'].includes(d.schema)||!validDraft(d.draft))throw Error('草稿格式不正确');checkpoint();draft=d.draft;selected=null;await loadImages();controls();save()}catch(e){say(e.message)}e.target.value=''};
 
 const DEFAULT_SERVER="";
 function chinaToday(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())}
@@ -117,6 +117,87 @@ function resizeImage(percent,oneStep=false){const i=current();if(!i||i.type!=='i
 $('imageScale').onpointerdown=()=>{imageScaleUndo=null};$('imageScale').oninput=()=>resizeImage($('imageScale').value);$('imageScale').onchange=()=>{imageScaleUndo=null};$('imageScale').onpointercancel=()=>{imageScaleUndo=null};
 $('imageSmaller').onclick=()=>{resizeImage(Number($('imageScale').value)-5,true);imageScaleUndo=null};$('imageLarger').onclick=()=>{resizeImage(Number($('imageScale').value)+5,true);imageScaleUndo=null};
 
+// BEGIN NOTICE LOCAL FEATURES
+// Shared by the standalone Mac publisher and the mobile publisher. No receiver changes.
+const NOTICE_LOCAL_VERSION='20261109-history-v1';
+function noticeBusy(){return pending||(typeof loadingDay!=='undefined'&&loadingDay)}
+function noticeMB(bytes){return (bytes/1000000).toFixed(1)+' MB'}
+function noticeDecode(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('图片无法读取'));im.src=src})}
+// Keep transparency and line art lossless; only JPEG photographs are re-encoded.
+function noticeEncode(c,photo=false){const png=c.toDataURL('image/png');if(!photo)return png;const jpg=c.toDataURL('image/jpeg',.88);return jpg.length<png.length?jpg:png}
+async function noticePrepare(source){
+ const copy=structuredClone(source);
+ for(const item of copy.items){if(item.type!=='image')continue;
+  const im=await noticeDecode(item.src),c=document.createElement('canvas');
+  const ratio=Math.min(1,Math.max(1,item.w*1.5)/im.naturalWidth,Math.max(1,item.h*1.5)/im.naturalHeight);
+  c.width=Math.max(1,Math.round(im.naturalWidth*ratio));c.height=Math.max(1,Math.round(im.naturalHeight*ratio));c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  const src=noticeEncode(c,/^data:image\/jpeg;/.test(item.src));if(src.length<item.src.length)item.src=src;
+ }
+ const c=document.createElement('canvas');c.lang=document.documentElement.lang||'zh-CN';c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle=copy.bg;g.fillRect(0,0,W,H);g.textBaseline='top';
+ for(const i of copy.items){if(i.type==='image'){g.drawImage(await noticeDecode(i.src),i.x,i.y,i.w,i.h);continue}
+  g.font=`${i.bold?'700':'400'} ${i.size}px system-ui,sans-serif`;g.fillStyle=i.color;let n=0;
+  for(const line of i.text.split('\n')){let s='';for(const ch of line){if(s&&g.measureText(s+ch).width>i.w){g.fillText(s,i.x,i.y+n++*i.size*1.35);s=ch}else s+=ch}g.fillText(s,i.x,i.y+n++*i.size*1.35)}
+ }
+ return {draft:copy,image:c.toDataURL('image/png')};
+}
+let noticeArchiveDBPromise;
+function noticeArchiveDB(){return noticeArchiveDBPromise||(noticeArchiveDBPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('notice-board-local-publications-v1',1);r.onupgradeneeded=()=>{r.result.createObjectStore('meta',{keyPath:'id'});r.result.createObjectStore('pictures');r.result.createObjectStore('settings')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)}))}
+async function noticeArchivePut(record){
+ const data=record.image.split(',')[1],bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0)),blob=new Blob([bytes],{type:'image/png'});
+ const meta={id:record.id||crypto.randomUUID(),scope:record.scope,date:record.date,revision:record.revision,updated:record.updated||new Date().toISOString(),savedAt:new Date().toISOString(),bytes:blob.size,legacy:!!record.legacy};
+ const database=await noticeArchiveDB();await new Promise((resolve,reject)=>{const t=database.transaction(['meta','pictures'],'readwrite');t.objectStore('meta').put(meta);t.objectStore('pictures').put(blob,meta.id);t.oncomplete=resolve;t.onerror=t.onabort=()=>reject(t.error||Error('本机存储不足'))});return meta;
+}
+async function noticeArchiveList(){const database=await noticeArchiveDB();return new Promise((resolve,reject)=>{const r=database.transaction('meta').objectStore('meta').getAll();r.onsuccess=()=>resolve(r.result.filter(m=>m.scope===scope()).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)||b.id.localeCompare(a.id)));r.onerror=()=>reject(r.error)})}
+async function noticeArchivePicture(id){const database=await noticeArchiveDB();return new Promise((resolve,reject)=>{const r=database.transaction('pictures').objectStore('pictures').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function noticeArchiveDelete(ids){const database=await noticeArchiveDB();return new Promise((resolve,reject)=>{const t=database.transaction(['meta','pictures'],'readwrite');for(const id of ids){t.objectStore('meta').delete(id);t.objectStore('pictures').delete(id)}t.oncomplete=resolve;t.onerror=t.onabort=()=>reject(t.error)})}
+// Import only existing daily snapshots once, never recreate a user-deleted history entry.
+async function noticeArchiveMigrate(){
+ const s=scope(),database=await noticeArchiveDB(),key='migrated|'+s;
+ const done=await new Promise((resolve,reject)=>{const r=database.transaction('settings').objectStore('settings').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});if(done)return;
+ const old=await db(),prefix=s+'|published|';
+ const records=await new Promise((resolve,reject)=>{const rows=[],r=old.transaction('records').objectStore('records').openCursor();r.onsuccess=()=>{const c=r.result;if(c){if(typeof c.key==='string'&&c.key.startsWith(prefix)&&c.value?.image)rows.push(c.value);c.continue()}else resolve(rows)};r.onerror=()=>reject(r.error)});
+ for(const r of records){await noticeArchivePut({...r,id:'legacy|'+s+'|'+r.date+'|'+(r.revision||'cached'),scope:s,legacy:true})}
+ await new Promise((resolve,reject)=>{const t=database.transaction('settings','readwrite');t.objectStore('settings').put(true,key);t.oncomplete=resolve;t.onerror=()=>reject(t.error)});
+}
+async function publishBoard(){
+ if(noticeBusy())return;
+ if(typeof finishEditor==='function'){finishEditor();if(updateOverflow())return say('画面内容有溢出，请先调整');if(draft.items.some(i=>i.type==='text'&&i.text.includes('【姓名】')))return say('请先选择姓名或修改占位文字')}
+ if(!connection){$('connect').click();return}
+ const date=activeDate,source=structuredClone(draft),signature=JSON.stringify(source),publicationScope=scope(),expected=revisions.get(date)||null;
+ pending=true;const locked=[...document.querySelectorAll('header button,aside button,aside input,aside select,aside textarea,#editorSheet input,#editorSheet select,#editorSheet textarea,#editorSheet button,#dock button,#menuDialog button,#dateBar input,#dateBar select,#dateBar button')].filter(e=>!e.disabled);locked.forEach(e=>e.disabled=true);
+ if(typeof syncBusy==='function')syncBusy();say('正在优化图片并发布 '+date+' 的公告…');
+ try{
+  await document.fonts.ready;const prepared=await noticePrepare(source);
+  const body={action:'publish',date,token:connection.token,withDates:false,...prepared,expected},size=new Blob([JSON.stringify(body)]).size;
+  if(size>20000000)throw Error('本次发布约 '+noticeMB(size)+'，超过20 MB。请减少图片或缩小图片显示尺寸；草稿已保留');
+  // Import the old daily cache before replacing it with the new publication.
+  let archiveReady=true;try{await noticeArchiveMigrate()}catch{archiveReady=false}
+  const result=await request('publish',{date,...prepared,expected});revisions.set(date,result.revision);published=prepared.image;dirty=JSON.stringify(draft)!==signature;
+  let archived=false;try{await noticeArchivePut({scope:publicationScope,date,image:prepared.image,revision:result.revision,updated:result.updated});archived=true}catch{}
+  let cached=true;try{await cachePut('published|'+date,{date,image:prepared.image,revision:result.revision,updated:result.updated});await cachePut('draft|'+date,{date,draft:structuredClone(draft)})}catch{cached=false}
+  say(date+' 发布成功 · '+(archived?'本机历史已保存':'本机历史保存失败，请立即导出公告图片备份')+(!cached?' · 草稿缓存失败，请导出草稿':'')+(!archiveReady?' · 旧缓存导入未完成':'')+' · 接收端点击「刷新」后接收');await refreshDates();
+ }catch(e){say('未发布：'+e.message)}finally{pending=false;locked.forEach(e=>e.disabled=false);controls();if(typeof syncBusy==='function')syncBusy()}
+}
+function noticeInstallLocalUI(){
+ if(viewer)return;
+ const css=document.createElement('style');css.textContent='#localArchiveDialog{width:min(94vw,900px);max-height:88dvh;overflow:auto}#localArchiveDialog .archiveBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}#archiveList{display:grid;gap:10px;margin:12px 0}.archiveRow{display:flex;align-items:center;gap:9px;border:1px solid #dce4dd;border-radius:8px;padding:10px;min-width:0}.archiveRow label{flex:1;min-width:0;overflow-wrap:anywhere;margin:0}.archiveRow input{width:auto!important}.archiveRow button{flex:none}#archivePicture{width:100%;max-height:55dvh;object-fit:contain;background:#eee}#archivePicture[hidden]{display:none}#archiveSummary,#archiveMessage{font-size:13px;line-height:1.6}#localArchiveDialog button{min-height:40px}';document.head.append(css);
+ const target=$('menuDialog')?.querySelector('.menuActions')||$('export').parentElement;
+ for(const [id,label] of [['clearBoard','清空当前画布'],['localArchive','本机发布历史']]){const b=document.createElement('button');b.id=id;b.textContent=label;target.append(b)}
+ const dialog=document.createElement('dialog');dialog.id='localArchiveDialog';dialog.innerHTML='<div class="archiveBar"><h2 style="flex:1;margin:0">本机发布历史</h2><button id="archiveClose">关闭</button></div><p id="archiveSummary"></p><p>只保存在当前设备和浏览器中；不自动清理，不上传云端。清除浏览器数据会丢失记录，重要画面请导出保存。</p><div class="archiveBar"><label>公告日期 <input id="archiveDate" type="date"></label><button id="archiveAllDates">全部日期</button><button id="archiveSelectAll">全选当前列表</button><button id="archiveDelete">删除所选</button></div><p id="archiveMessage" role="status"></p><img id="archivePicture" alt="本机历史公告预览" hidden><div id="archiveList"></div>';document.body.append(dialog);
+ let rows=[],previewURL=null;
+ function releasePreview(){if(previewURL)URL.revokeObjectURL(previewURL);previewURL=null;$('archivePicture').hidden=true;$('archivePicture').removeAttribute('src')}
+ async function picture(row,exporting=false){try{const blob=await noticeArchivePicture(row.id);if(!blob)throw Error('本机画面不存在');if(exporting){download('公告板_'+row.date+'_'+row.savedAt.replace(/[:.]/g,'-')+'.png',blob,'image/png');return}releasePreview();previewURL=URL.createObjectURL(blob);$('archivePicture').src=previewURL;$('archivePicture').hidden=false;$('archiveMessage').textContent='正在查看：'+row.date+' · '+new Date(row.updated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});$('archivePicture').scrollIntoView({block:'nearest'})}catch(e){$('archiveMessage').textContent=e.message}}
+ async function render(){rows=await noticeArchiveList();const filtered=rows.filter(r=>!$('archiveDate').value||r.date===$('archiveDate').value);$('archiveSummary').textContent='共 '+rows.length+' 份 · 占用约 '+noticeMB(rows.reduce((n,r)=>n+r.bytes,0))+' · 当前显示 '+filtered.length+' 份';$('archiveList').replaceChildren();if(!filtered.length)$('archiveList').textContent='暂无记录。新版启用后，每次成功发布都会在此保存一份。';for(const row of filtered){const div=document.createElement('div');div.className='archiveRow';const box=document.createElement('input');box.type='checkbox';box.value=row.id;box.setAttribute('aria-label','选择 '+row.date+' '+row.updated);const label=document.createElement('label');label.append(box,document.createTextNode(' '+row.date+' · '+new Date(row.updated).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})+(row.legacy?'（旧缓存）':'')+' · '+noticeMB(row.bytes)));const view=document.createElement('button');view.textContent='查看';view.onclick=()=>picture(row);const exp=document.createElement('button');exp.textContent='导出';exp.onclick=()=>picture(row,true);div.append(label,view,exp);$('archiveList').append(div)}}
+ $('clearBoard').onclick=()=>{if(noticeBusy())return;if(typeof finishEditor==='function')finishEditor();checkpoint();draft={bg:draft.bg,items:[]};selected=null;images.clear();controls();save();$('menuDialog')?.close();say('当前画布已清空，可撤销；点击发布后教室端才会清空')};
+ $('localArchive').onclick=async()=>{if(noticeBusy())return;$('menuDialog')?.close();dialog.showModal();releasePreview();$('archiveMessage').textContent='正在读取本机记录…';try{await noticeArchiveMigrate();await render();$('archiveMessage').textContent='删除只影响本机历史，不影响当前草稿和云端公告。'}catch(e){$('archiveMessage').textContent='读取失败：'+e.message}};
+ $('archiveDate').onchange=()=>render().catch(e=>$('archiveMessage').textContent=e.message);$('archiveAllDates').onclick=()=>{$('archiveDate').value='';$('archiveDate').onchange()};$('archiveSelectAll').onclick=()=>{const boxes=[...$('archiveList').querySelectorAll('input')],all=boxes.every(b=>b.checked);boxes.forEach(b=>b.checked=!all)};
+ $('archiveDelete').onclick=async()=>{const ids=[...$('archiveList').querySelectorAll('input:checked')].map(b=>b.value);if(!ids.length){$('archiveMessage').textContent='请先勾选要删除的记录';return}if(!confirm('删除选中的 '+ids.length+' 份本机历史？删除后无法恢复。云端公告与草稿不受影响。'))return;try{await noticeArchiveDelete(ids);releasePreview();await render();$('archiveMessage').textContent='已删除 '+ids.length+' 份本机历史'}catch(e){$('archiveMessage').textContent='删除失败：'+e.message}};
+ $('archiveClose').onclick=()=>dialog.close();dialog.addEventListener('close',releasePreview);
+ $('publish').onclick=publishBoard;
+}
+noticeInstallLocalUI();
+
+// END NOTICE LOCAL FEATURES
 (async()=>{$('workDate').value=activeDate;$('dateInfo').textContent=activeDate===chinaToday()?'今天':activeDate+' · 历史日期';
  if(viewer){document.body.classList.add('viewer');if(params.has('url')&&params.has('token')){try{connection=validateConnection({schema:'notice-cloud-connection-v1',role:'receiver',url:params.get('url'),token:params.get('token')},'view');persistConnection();window.history.replaceState(null,'','#mode=view'+(params.has('date')?'&date='+params.get('date'):''))}catch{connection=null}}else try{const c=JSON.parse(localStorage.getItem('notice-view-connection-v1'));if(c)connection=validateConnection(c,'view')}catch{}if(!connection){$('viewStatus').textContent='点击「连接」，导入只读连接文件';$('exportEditConnection').hidden=true;$('exportViewConnection').hidden=true;$('connectionDialog').showModal();return}await changeDate(activeDate,false);await refreshDates();return}
  loadingDay=true;syncBusy();try{const c=JSON.parse(localStorage.getItem(connKey)||'null');if(c)connection=validateConnection(c,'edit');receiverConnection=JSON.parse(localStorage.getItem('notice-receiver-export')||'null')}catch{}let initial;try{initial=await cacheGet('draft|'+activeDate)}catch{}if(!initial){await cachePut('draft|'+activeDate,{date:activeDate,draft})}try{await loadEditorDay(++dateGeneration);await refreshDates()}finally{loadingDay=false;controls();syncBusy();updateDateLabel()}})();
